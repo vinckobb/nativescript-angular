@@ -255,3 +255,5 @@ export class NativeScriptPlatformRef extends PlatformRef {
         return errorTextBox;
     }
 }
+
+class RootView extends ContentView {}
