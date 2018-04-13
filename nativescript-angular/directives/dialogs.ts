@@ -13,6 +13,7 @@ import { Page } from "tns-core-modules/ui/page";
 import { View, ViewBase } from "tns-core-modules/ui/core/view";
 import { ProxyViewContainer } from "tns-core-modules/ui/proxy-view-container/proxy-view-container";
 
+import { NSRouteReuseStrategy } from "../router/ns-route-reuse-strategy";
 import { AppHostView } from "../app-host-view";
 import { DetachedLoader } from "../common/detached-loader";
 import { PageFactory, PAGE_FACTORY } from "../platform-providers";
@@ -44,6 +45,10 @@ interface ShowDialogOptions {
 
 @Injectable()
 export class ModalDialogService {
+
+    constructor(private reuseStrategy: NSRouteReuseStrategy) {
+    }
+
     public showModal(type: Type<any>,
         { viewContainerRef, moduleRef, context, fullscreen }: ModalDialogOptions
     ): Promise<any> {
