@@ -28,24 +28,9 @@
     "type": "git",
     "url": "https://github.com/NativeScript/nativescript-angular.git"
   },
-  "ngPackage": {
-    "lib": {
-      "entryFile": "index.ts"
-    },
-    "whitelistedNonPeerDependencies": [
-      "nativescript-intl"
-    ]
-  },
-  "scripts": {
-    "tslint": "tslint --project tsconfig.json --config tslint.json",
-    "postinstall": "node postinstall.js",
-    "tsc": "tsc -p tsconfig.json",
-    "tsc-w": "tsc -p tsconfig.json -w",
-    "ngc": "ngc -p tsconfig.json",
-    "prepare": "npm run ngc"
-  },
   "dependencies": {
-    "nativescript-intl": "^3.0.0"
+    "nativescript-intl": "^3.0.0",
+    "tslib": "^1.9.0"
   },
   "peerDependencies": {
     "reflect-metadata": "^0.1.8",
@@ -80,5 +65,10 @@
     "tslint": "^5.5.0",
     "typescript": "~2.7.2",
     "zone.js": "^0.8.12"
-  }
+  },
+  "main": "bundles/nativescript-angular.umd.js",
+  "module": "esm5/nativescript-angular.js",
+  "es2015": "esm2015/nativescript-angular.js",
+  "typings": "nativescript-angular.d.ts",
+  "metadata": "nativescript-angular.metadata.json"
 }
