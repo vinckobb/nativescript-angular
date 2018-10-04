@@ -179,7 +179,9 @@ export class PageRouterOutlet implements OnDestroy { // tslint:disable-line:dire
             this.routeReuseStrategy.clearModalCache(this.outlet.outletKey);
             this.locationStrategy.clearOutlet(this.frame, this.outlet);
         } else {
-            log("NSLocationStrategy.ngOnDestroy: no outlet available for page-router-outlet");
+            if (isLogEnabled()) {
+              log("NSLocationStrategy.ngOnDestroy: no outlet available for page-router-outlet");
+            }
         }
     }
 
