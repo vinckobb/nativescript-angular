@@ -212,7 +212,7 @@ export class NSLocationStrategy extends LocationStrategy {
             }
             this.callPopState(state, true);
         } else {
-            let state = this.currentOutlet.peekState();
+            let state = this.currentOutlet && this.currentOutlet.peekState();
             if (state && state.isPageNavigation) {
                 // This was a page navigation - so navigate through frame.
                 if (isLogEnabled()) {
@@ -353,7 +353,7 @@ export class NSLocationStrategy extends LocationStrategy {
     }
 
         this.currentOutlet = this.getOutletByFrame(frame);
-        const lastState = this.currentOutlet.peekState();
+        const lastState = this.currentOutlet && this.currentOutlet.peekState();
 
         if (lastState) {
             lastState.isPageNavigation = true;
