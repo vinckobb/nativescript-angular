@@ -18,12 +18,14 @@
     </GridLayout> -->
     <GridLayout rows="auto,*">
         <Button text="Back(ActivatedRoute)" (tap)="backActivatedRoute()"></Button>
-        <TabView row="1" androidTabsPosition="bottom">
-            <page-router-outlet *tabItem="{title: 'Players Tab'}" name="playerTab">
-            </page-router-outlet>
+        <GridLayout row="1">
+            <TabView androidTabsPosition="bottom">
+                <page-router-outlet *tabItem="{title: 'Players Tab'}" name="playerTab">
+                </page-router-outlet>
 
-            <page-router-outlet *tabItem="{title: 'Teams Tab'}" name="teamTab">
-            </page-router-outlet>
-        </TabView>
+                <page-router-outlet *tabItem="{title: 'Teams Tab'}" name="teamTab">
+                </page-router-outlet>
+            </TabView>
+        </GridLayout>
     </GridLayout>
 </StackLayout>

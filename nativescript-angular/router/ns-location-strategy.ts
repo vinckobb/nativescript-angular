@@ -14,7 +14,7 @@ export class Outlet {
     outletKey: string;
     pathByOutlets: string;
     statesByOutlet: Array<LocationState> = [];
-    frames: Array<Frame> = [];
+    frame: Frame;
 
     // Used in reuse-strategy by its children to determine if they should be detached too.
     shouldDetach: boolean = true;
@@ -26,11 +26,16 @@ export class Outlet {
         this.pathByOutlets = pathByOutlets;
     }
 
-    peekState() {
+    peekState(): LocationState {
         if (this.statesByOutlet.length > 0) {
             return this.statesByOutlet[this.statesByOutlet.length - 1];
         }
         return null;
+    }
+
+    containsLastState(stateUrl: string): boolean {
+        const lastState = this.peekState();
+        return lastState && lastState.segmentGroup.toString() === stateUrl;
     }
 }
 
@@ -49,7 +54,6 @@ export interface LocationState {
     segmentGroup: UrlSegmentGroup;
     isRootSegmentGroup: boolean;
     isPageNavigation: boolean;
-    modalNavigationDepth: number;
     parentRoute?: string;
 }
 
@@ -135,15 +139,14 @@ export class NSLocationStrategy extends LocationStrategy {
                     const parentOutletKey = this.getSegmentGroupFullPath(currentTree.parent) + parentOutletName;
                     let parentOutlet = this.findOutletByKey(parentOutletKey);
 
+                    const containsLastState = outlet && outlet.containsLastState(currentSegmentGroup.toString());
                     if (!outlet) {
                         // tslint:disable-next-line:max-line-length
                         outlet = this.createOutlet(outletKey, currentSegmentGroup, parentOutlet, this._modalNavigationDepth);
                         this.currentOutlet = outlet;
-                    } else if (this._modalNavigationDepth > 0) {
+                    } else if (this._modalNavigationDepth > 0 && outlet.showingModal && !containsLastState) {
                         // Navigation inside modal view.
-                        if (this.updateStates(outlet, currentSegmentGroup, this._modalNavigationDepth)) {
-                            this.currentOutlet = outlet; // If states updated
-                        }
+                        this.upsertModalOutlet(outlet, currentSegmentGroup);
                     } else {
                         outlet.parent = parentOutlet;
 
@@ -205,7 +208,7 @@ export class NSLocationStrategy extends LocationStrategy {
                     const topmostFrame = this.frameService.getFrame();
                     this.currentOutlet = this.getOutletByFrame(topmostFrame);
                 }
-                this.currentOutlet.frames[this.currentOutlet.frames.length - 1].goBack();
+                this.currentOutlet.frame.goBack();
             } else {
                 // Nested navigation - just pop the state
                 routerLog("NSLocationStrategy.back() while not navigating back but top" +
@@ -214,7 +217,6 @@ export class NSLocationStrategy extends LocationStrategy {
                 this.callPopState(this.currentOutlet.statesByOutlet.pop(), true);
             }
         }
-
     }
 
     canGoBack(outlet?: Outlet) {
@@ -232,17 +234,16 @@ export class NSLocationStrategy extends LocationStrategy {
         return "";
     }
 
-    private callPopState(state: LocationState, pop: boolean = true) {
+    private callPopState(state: LocationState, pop: boolean = true, outlet?: Outlet) {
+        outlet = outlet || this.currentOutlet;
         const urlSerializer = new DefaultUrlSerializer();
-        let changedOutlet = this.getSegmentGroup(this.currentOutlet.pathByOutlets);
+        let changedOutlet = this.getSegmentGroup(outlet.pathByOutlets);
 
         if (state && changedOutlet) {
             this.updateSegmentGroup(this.currentUrlTree.root, changedOutlet, state.segmentGroup);
         } else {
             // when closing modal view there are scenarios (e.g. root viewContainerRef) when we need
             // to clean up the named page router outlet to make sure we will open the modal properly again if needed.
-            const topmostFrame = this.frameService.getFrame();
-            this.currentOutlet = this.getOutletByFrame(topmostFrame);
             this.updateSegmentGroup(this.currentUrlTree.root, changedOutlet, null);
         }
 
@@ -260,7 +261,7 @@ export class NSLocationStrategy extends LocationStrategy {
             const outletStates = outlet.statesByOutlet;
             const outletLog = outletStates
                 // tslint:disable-next-line:max-line-length
-                .map((v, i) => `${outlet.outletKey}.${i}.[${v.isPageNavigation ? "PAGE" : "INTERNAL"}].[${v.modalNavigationDepth ? "MODAL" : "BASE"}] "${v.segmentGroup.toString()}"`)
+                .map((v, i) => `${outlet.outletKey}.${i}.[${v.isPageNavigation ? "PAGE" : "INTERNAL"}].[${outlet.modalNavigationDepth ? "MODAL" : "BASE"}] "${v.segmentGroup.toString()}"`)
                 .reverse();
 
             result = result.concat(outletLog);
@@ -306,12 +307,8 @@ export class NSLocationStrategy extends LocationStrategy {
         routerLog("NSLocationStrategy.finishCloseModalNavigation()");
         this._modalNavigationDepth--;
 
-        this.currentOutlet = this.findOutletByModal(this._modalNavigationDepth) || this.currentOutlet;
+        this.currentOutlet = this.findOutletByModal(this._modalNavigationDepth, true) || this.currentOutlet;
         this.currentOutlet.showingModal = false;
-
-        this.currentOutlet.statesByOutlet = this.currentOutlet.statesByOutlet.filter(state => {
-            return state.modalNavigationDepth <= this._modalNavigationDepth;
-        });
 
         this.callPopState(this.currentOutlet.peekState(), false);
     }
@@ -356,18 +353,21 @@ export class NSLocationStrategy extends LocationStrategy {
             return;
         }
 
-        if (!outlet.frames.some(currentFrame => currentFrame === frame)) {
-            outlet.frames.push(frame);
+        if (!outlet.frame) {
+            outlet.frame = frame;
         }
 
         this.currentOutlet = outlet;
     }
 
     clearOutlet(frame: Frame, outlet: Outlet) {
-        // Remove outlet only if the destroying frame is the last one int the outlet frames.
         this.outlets = this.outlets.filter(currentOutlet => {
-            currentOutlet.frames = currentOutlet.frames.filter(currentFrame => currentFrame !== frame);
-            return currentOutlet.frames.length;
+            // Remove current outlet, if it's named p-r-o, from the url tree.
+            const isEqualToCurrent = currentOutlet.pathByOutlets === this.currentOutlet.pathByOutlets;
+            if (currentOutlet.frame === frame && !isEqualToCurrent) {
+                this.callPopState(null, true, currentOutlet);
+            }
+            return currentOutlet.frame !== frame;
         });
     }
 
@@ -427,9 +427,10 @@ export class NSLocationStrategy extends LocationStrategy {
         return pathToOutlet || lastPath;
     }
 
-    findOutletByModal(modalNavigation: number): Outlet {
+    findOutletByModal(modalNavigation: number, isShowingModal?: boolean): Outlet {
         return this.outlets.find((outlet) => {
-            return outlet.modalNavigationDepth === modalNavigation && outlet.showingModal;
+            let isEqual = outlet.modalNavigationDepth === modalNavigation;
+            return isShowingModal ? isEqual && outlet.showingModal : isEqual;
         });
     }
 
@@ -447,7 +448,7 @@ export class NSLocationStrategy extends LocationStrategy {
         for (let index = 0; index < this.outlets.length; index++) {
             const currentOutlet = this.outlets[index];
 
-            if (currentOutlet.frames.some(currentFrame => currentFrame === frame)) {
+            if (currentOutlet.frame === frame) {
                 outlet = currentOutlet;
                 break;
             }
@@ -456,13 +457,12 @@ export class NSLocationStrategy extends LocationStrategy {
         return outlet;
     }
 
-    private updateStates(outlet: Outlet, currentSegmentGroup: UrlSegmentGroup, modalNavigation?: number): boolean {
+    private updateStates(outlet: Outlet, currentSegmentGroup: UrlSegmentGroup): boolean {
         const isNewPage = outlet.statesByOutlet.length === 0;
         const lastState = outlet.statesByOutlet[outlet.statesByOutlet.length - 1];
-        const equalStateUrls = lastState && lastState.segmentGroup.toString() === currentSegmentGroup.toString();
+        const equalStateUrls = outlet.containsLastState(currentSegmentGroup.toString());
 
         const locationState: LocationState = {
-            modalNavigationDepth: modalNavigation || 0,
             segmentGroup: currentSegmentGroup,
             isRootSegmentGroup: lastState ? lastState.isRootSegmentGroup : false,
             isPageNavigation: isNewPage
@@ -471,7 +471,7 @@ export class NSLocationStrategy extends LocationStrategy {
         if (!lastState || !equalStateUrls) {
             outlet.statesByOutlet.push(locationState);
 
-            if (modalNavigation === 0 && !outlet.showingModal) {
+            if (this._modalNavigationDepth === 0 && !outlet.showingModal) {
                 this.updateParentsStates(outlet, currentSegmentGroup.parent);
             }
 
@@ -510,7 +510,6 @@ export class NSLocationStrategy extends LocationStrategy {
         const newOutlet = new Outlet(outletKey, pathByOutlets, modalNavigation);
 
         const locationState: LocationState = {
-            modalNavigationDepth: modalNavigation || 0,
             segmentGroup: segmentGroup,
             isRootSegmentGroup: isRootSegmentGroup,
             isPageNavigation: true // It is a new OutletNode.
@@ -557,6 +556,26 @@ export class NSLocationStrategy extends LocationStrategy {
             });
 
             currentTree = queue.shift();
+        }
+    }
+
+    private upsertModalOutlet(parentOutlet: Outlet, segmentedGroup: UrlSegmentGroup) {
+        let currentModalOutlet = this.findOutletByModal(this._modalNavigationDepth);
+
+        // We want to treat every p-r-o as a standalone Outlet.
+        if (!currentModalOutlet) {
+            if (this._modalNavigationDepth > 1) {
+                // The parent of the current Outlet should be the previous opened modal (if any).
+                parentOutlet = this.findOutletByModal(this._modalNavigationDepth - 1);
+            }
+
+            // No currentModalOutlet available when opening 'primary' p-r-o.
+            const outletName = "primary";
+            const outletKey = parentOutlet.peekState().segmentGroup.toString() + outletName;
+            currentModalOutlet = this.createOutlet(outletKey, segmentedGroup, parentOutlet, this._modalNavigationDepth);
+            this.currentOutlet = currentModalOutlet;
+        } else if (this.updateStates(currentModalOutlet, segmentedGroup)) {
+            this.currentOutlet = currentModalOutlet; // If states updated
         }
     }
 }

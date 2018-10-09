@@ -100,7 +100,7 @@ export class NSRouteReuseStrategy implements RouteReuseStrategy {
         const key = getSnapshotKey(route);
         const isPageActivated = route[pageRouterActivatedSymbol];
         const isBack = outlet ? outlet.isPageNavigationBack : false;
-        let shouldDetach = !isBack && isPageActivated;
+        let shouldDetach = outlet && !isBack && isPageActivated;
 
         if (outlet) {
             if (outlet.parent && !outlet.parent.shouldDetach) {

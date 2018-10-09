@@ -25,7 +25,6 @@ import { DetachedLoader } from "../common/detached-loader";
 import { ViewUtil } from "../view-util";
 import { NSLocationStrategy, Outlet } from "./ns-location-strategy";
 import { NSRouteReuseStrategy } from "./ns-route-reuse-strategy";
-import { FrameService } from "../platform-providers";
 
 export class PageRoute {
     activatedRoute: BehaviorSubject<ActivatedRoute>;
@@ -153,8 +152,7 @@ export class PageRouterOutlet implements OnDestroy { // tslint:disable-line:dire
         @Inject(DEVICE) device: Device,
         @Inject(PAGE_FACTORY) private pageFactory: PageFactory,
         private routeReuseStrategy: NSRouteReuseStrategy,
-        elRef: ElementRef,
-        private frameService: FrameService
+        elRef: ElementRef
     ) {
         this.frame = elRef.nativeElement;
         log("PageRouterOutlet.constructor frame:" + this.frame);
@@ -170,8 +168,13 @@ export class PageRouterOutlet implements OnDestroy { // tslint:disable-line:dire
         // Clear accumulated modal view page cache when page-router-outlet
         // destroyed on modal view closing
         this.parentContexts.onChildOutletDestroyed(this.name);
-        this.routeReuseStrategy.clearModalCache(this.outlet.outletKey);
-        this.locationStrategy.clearOutlet(this.frame, this.outlet);
+
+        if (this.outlet) {
+            this.routeReuseStrategy.clearModalCache(this.outlet.outletKey);
+            this.locationStrategy.clearOutlet(this.frame, this.outlet);
+        } else {
+            log("NSLocationStrategy.ngOnDestroy: no outlet available for page-router-outlet");
+        }
     }
 
     deactivate(): void {
@@ -236,13 +239,14 @@ export class PageRouterOutlet implements OnDestroy { // tslint:disable-line:dire
         const topActivatedRoute = findTopActivatedRouteNodeForOutlet(activatedRoute.snapshot);
 
         if (!this.outlet) {
-            const outletKey = this.locationStrategy.getRouteFullPath(topActivatedRoute);
-            this.outlet = this.locationStrategy.findOutletByKey(outletKey);
+            const modalNavigation = this.locationStrategy._modalNavigationDepth;
 
             // Modal with 'primary' p-r-o
-            if (!this.outlet) {
-                const pathByOutlets = this.locationStrategy.getPathByOutlets(topActivatedRoute);
-                this.outlet = this.locationStrategy.findOutletByOutletPath(pathByOutlets);
+            if (modalNavigation > 0) {
+                this.outlet = this.locationStrategy.findOutletByModal(modalNavigation);
+            } else {
+                const outletKey = this.locationStrategy.getRouteFullPath(topActivatedRoute);
+                this.outlet = this.locationStrategy.findOutletByKey(outletKey);
             }
         }
 
@@ -317,7 +321,9 @@ export class PageRouterOutlet implements OnDestroy { // tslint:disable-line:dire
         // Clear refCache if navigation with clearHistory
         if (navOptions.clearHistory) {
             const clearCallback = () => setTimeout(() => {
-                this.routeReuseStrategy.clearCache(this.outlet.outletKey);
+                if (this.outlet) {
+                    this.routeReuseStrategy.clearCache(this.outlet.outletKey);
+                }
                 page.off(Page.navigatedToEvent, clearCallback);
             });
 
@@ -347,7 +353,7 @@ export class PageRouterOutlet implements OnDestroy { // tslint:disable-line:dire
             const outletForRoute = this.locationStrategy.findOutletByKey(outletKeyForRoute);
 
             // Mark p-r-o's only
-            if (outletForRoute && outletForRoute.frames.length) {
+            if (outletForRoute && outletForRoute.frame) {
                 nodeToMark[pageRouterActivatedSymbol] = true;
                 log("Activated route marked as page: " + routeToString(nodeToMark));
             }

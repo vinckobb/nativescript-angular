@@ -112,11 +112,6 @@ export class RouterExtensions {
 
                 if (outlet) {
                     outletsToBack.push(outlet);
-                } else {
-                    // Modal with 'primary' p-r-o
-                    const pathByOutlets = this.locationStrategy.getPathByOutlets(currentRouteSnapshop);
-                    outlet = this.locationStrategy.findOutletByOutletPath(pathByOutlets);
-                    outletsToBack.push(outlet);
                 }
             }
         }
