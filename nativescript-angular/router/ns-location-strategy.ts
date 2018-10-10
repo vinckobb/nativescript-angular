@@ -331,8 +331,10 @@ export class NSLocationStrategy extends LocationStrategy {
       }
 
         this.currentOutlet = this.getOutletByFrame(frame);
-        this.currentOutlet.showingModal = true;
-        this._modalNavigationDepth++;
+        if (this.currentOutlet) {
+          this.currentOutlet.showingModal = true;
+          this._modalNavigationDepth++;
+        }
     }
 
     public _finishCloseModalNavigation() {
@@ -342,9 +344,11 @@ export class NSLocationStrategy extends LocationStrategy {
         this._modalNavigationDepth--;
 
         this.currentOutlet = this.findOutletByModal(this._modalNavigationDepth, true) || this.currentOutlet;
-        this.currentOutlet.showingModal = false;
-
-        this.callPopState(this.currentOutlet.peekState(), false);
+        if (this.currentOutlet) {
+          this.currentOutlet.showingModal = false;
+  
+          this.callPopState(this.currentOutlet.peekState(), false);
+        }
     }
 
     public _beginPageNavigation(frame: Frame): NavigationOptions {
