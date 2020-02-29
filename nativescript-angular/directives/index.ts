@@ -1,5 +1,5 @@
 import { ListViewComponent } from "./list-view-comp";
-import { TemplateKeyDirective, SetupItemViewArgs, TemplatedItemsComponent } from "./templated-items-comp";
+import { TemplateKeyDirective, TemplatedItemsComponent } from "./templated-items-comp";
 import { TabViewDirective, TabViewItemDirective } from "./tab-view";
 import {
     ActionBarComponent,
@@ -26,7 +26,6 @@ export const NS_DIRECTIVES = [
 export {
     ListViewComponent,
     TemplateKeyDirective,
-    SetupItemViewArgs,
     TemplatedItemsComponent,
     TabViewDirective,
     TabViewItemDirective,
